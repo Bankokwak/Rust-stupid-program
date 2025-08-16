@@ -8,7 +8,7 @@ struct Account {
     inventory: HashMap<String, i32>
 }
 
-fn log_in(database_login: &HashMap<&str, &str>, username: &str, password: &str) -> bool {
+fn log_in(database_login: &HashMap<String, String>, username: &str, password: &str) -> bool {
     for (user, pass) in database_login{
         if *user == username && *pass == password {
             return true;
@@ -27,8 +27,8 @@ fn prompt(message: &str) -> String {
 }
 
 fn main() {
-    let mut database_login: HashMap<&str, &str> = HashMap::new();
-    database_login.insert("admin", "admin");
+    let mut database_login: HashMap<String, String> = HashMap::new();
+    database_login.insert("admin".to_string(), "admin".to_string());
 
     let mut database_account: HashMap<String, Account> = HashMap::new();
     database_account.insert("admin".to_string(), Account { username: "admin".to_string(), isadmin: true, money: 100.0, inventory: HashMap::new()});
@@ -39,7 +39,8 @@ fn main() {
     login(&mut database_login, &mut database_account, &mut item_shop);
 }
 
-fn login(mut database_login: &mut HashMap<&str, &str>, mut database_account: &mut HashMap<String, Account>, mut item_shop: &mut HashMap<String, f64>){
+fn login(mut database_login: &mut HashMap<String, String>, mut database_account: &mut HashMap<String, Account>, mut item_shop: &mut HashMap<String, f64>){
+    print!("\n");
     let username = prompt("Username: ");
     let password = prompt("Password: ");
     if !log_in(&database_login, &username, &password) {
@@ -50,7 +51,7 @@ fn login(mut database_login: &mut HashMap<&str, &str>, mut database_account: &mu
     connected(&mut database_login, &mut database_account, &mut item_shop,&username);
 }
 
-fn connected(mut database_login: &mut HashMap<&str, &str>, mut database_account: &mut HashMap<String, Account>, mut item_shop: &mut HashMap<String, f64>, username: &str){
+fn connected(mut database_login: &mut HashMap<String, String>, mut database_account: &mut HashMap<String, Account>, mut item_shop: &mut HashMap<String, f64>, username: &str){
     loop{
         print!("\n");
         println!("Menu:\n   1: Compte\n   2: Magasin\n   3: Casino\n   4: Admin\n   5: Deconnexion");
@@ -59,6 +60,7 @@ fn connected(mut database_login: &mut HashMap<&str, &str>, mut database_account:
             "2" => choice_shop(&mut database_account, &item_shop, &username),
             "3" => println!("Coming soon"),
             "4" => choice_admin(&mut database_login, &mut database_account, &mut item_shop, &username),
+            "5" => login(&mut database_login, &mut database_account, &mut item_shop),
             _ => {
                 println!("Mauvais choix.");
                 prompt("Appuyez sur entrer pour continuer.");
@@ -138,7 +140,7 @@ fn choice_shop(database_account: &mut HashMap<String, Account>, item_shop: &Hash
     }
 }
 
-fn choice_admin(database_login: &mut HashMap<&str, &str>, database_account: &mut HashMap<String, Account>, item_shop: &mut HashMap<String, f64>, username: &str){
+fn choice_admin(database_login: &mut HashMap<String, String>, database_account: &mut HashMap<String, Account>, item_shop: &mut HashMap<String, f64>, username: &str){
     loop{
         print!("\n");
         if let Some(account) = database_account.get(username){
@@ -152,7 +154,7 @@ fn choice_admin(database_login: &mut HashMap<&str, &str>, database_account: &mut
             match buffer.as_str(){
                 "1" => choice_admin_item(item_shop),
                 "2" => choice_admin_account(database_account),
-                "3" => choice_admin_login(database_login),
+                "3" => choice_admin_login(database_login, database_account),
                 "4" => break,
                 _ => {
                     println!("Mauvais choix.");
@@ -280,48 +282,117 @@ fn choice_admin_account(database_account: &mut HashMap<String, Account>){
                 println!("\nModifier un compte:");
                 let account_name: String = prompt("Username du compte à modifier ou entre (cancel) pour annuler: ");
                 if account_name == "cancel" {
-                    break;
+                    continue;
                 }
 
                 if !database_account.contains_key(&account_name) {
                     println!("Ce compte n'existe pas.");
                     continue;
                 }
-                println!("{}\n   1: Money\n   2: IsAdmin\n   3: Inventaire", &account_name);
-                if let Some(account) = database_account.get_mut(&account_name){
-                    let buffer: String = prompt("Entrez un champ à modifier : ");
-                    match buffer.as_str(){
-                        "1" => {
-                            println!("Ce compte a {}€", account.money);
-                            let buffer: String = prompt("A combien d'argent voulez vous mettre ce compte : ");
+                loop {
+                    println!("{}\n   1: Money\n   2: IsAdmin\n   3: Inventaire", &account_name);
+                    if let Some(account) = database_account.get_mut(&account_name){
+                        let buffer: String = prompt("Entrez un champ à modifier : ");
+                        print!("\n");
+                        match buffer.as_str(){
+                            "1" => {
+                                println!("Ce compte a {}€", account.money);
+                                let buffer: String = prompt("A combien d'argent voulez vous mettre ce compte ou entre (cancel) pour annuler : ");
 
-                            if let Ok(num) = buffer.parse::<f64>(){
-                                account.money = num;
-                                println!("Le compte {} a maintenant {}€", account_name, account.money);
-                            }else{
-                                println!("Le chiffre n'est pas correct.");
+                                if buffer == "cancel" {
+                                    break;
+                                }
+
+                                if let Ok(num) = buffer.parse::<f64>(){
+                                    account.money = num;
+                                    println!("Le compte {} a maintenant {}€", account_name, account.money);
+                                }else{
+                                    println!("Le chiffre n'est pas correct.");
+                                    prompt("Appuyez sur entrer pour continuer.");
+                                }
+                            },
+                            "2" => {
+                                println!("Ce compte a IsAdmin = {}", account.isadmin);
+                                let buffer: String = prompt("Status du compte (true or false) ou entre (cancel) pour annuler : ");
+
+                                if buffer == "cancel" {
+                                    break;
+                                }
+
+                                if let Ok(num) = buffer.parse::<bool>(){
+                                    account.isadmin = num;
+                                    println!("Le compte {} a IsAdmin = {}", account_name, account.isadmin);
+                                }else{
+                                    println!("Le boolean n'est pas correct.");
+                                    prompt("Appuyez sur entrer pour continuer.");
+                                }
+                            },
+                            "3" => {
+                                println!("Inventaire:");
+                                for (name, number) in &account.inventory {
+                                    println!("   {} : {}", name, number);
+                                }
+                                let buffer: String = prompt("Que voulez vous faire.\n   1: Ajouter un item\n   2: Supprimer un item\nChoix: ");
+                                match buffer.as_str(){
+                                    "1" => {
+                                        println!("Inventaire:\n   Ajout item:");
+                                        let name_item: String = prompt("Nom de l'item à rajouter ou entre (cancel) pour annuler : ");
+                                        print!("Nombre de {}", name_item);
+                                        let number_item: String = prompt(" à rajouter ou entre (cancel) pour annuler : ");
+                                        
+                                        if name_item == "cancel" || number_item == "cancel" {
+                                            break;
+                                        }
+
+                                        if let Ok(num) = number_item.parse::<i32>(){
+                                            account.inventory.insert(name_item.clone(), num);
+                                            println!("Vous avez bien ajouter {} {}", num, name_item);
+                                        }else{
+                                            println!("Le chiffre n'est pas correct.");
+                                            prompt("Appuyez sur entrer pour continuer.");
+                                        }
+                                    },
+                                    "2" => {
+                                        println!("Inventaire:\n   Suppression item:");
+                                        let name_item: String = prompt("Nom de l'item à supprimer ou entre (cancel) pour annuler : ");
+                                        print!("Nombre de {}", name_item);
+                                        let number_item: String = prompt(" à supprimer ou entre (cancel) pour annuler : ");
+                                        
+                                        if name_item == "cancel" || number_item == "cancel" {
+                                            break;
+                                        }
+
+                                        if !account.inventory.contains_key(&name_item){
+                                            println!("Aucun item existe avec le nom {}", name_item);
+                                            continue;
+                                        }
+
+                                        if let Some(item_number) = account.inventory.get_mut(&name_item){
+                                            if let Ok(num) = number_item.parse::<i32>(){                                
+                                                let number_delete: i32 = *item_number - num;
+                                                if number_delete <= 0{
+                                                    account.inventory.remove(&name_item);
+                                                }else{
+                                                    account.inventory.insert(name_item.clone(), number_delete);
+                                                }
+                                                println!("Vous avez supprimer {} {}", number_delete, name_item);
+                                            }else{
+                                                println!("Le chiffre n'est pas correct.");
+                                                prompt("Appuyez sur entrer pour continuer.");
+                                            }
+                                        }
+                                    },
+                                    _ => {
+                                        println!("Mauvais choix.");
+                                        prompt("Appuyez sur entrer pour continuer.");
+                                    },
+                                }
+                            },
+                            _ => {
+                                println!("Mauvais choix.");
                                 prompt("Appuyez sur entrer pour continuer.");
-                            }
-                        },
-                        "2" => {
-                            println!("Ce compte a IsAdmin = {}", account.isadmin);
-                            let buffer: String = prompt("Status du compte (true or false) : ");
-
-                            if let Ok(num) = buffer.parse::<bool>(){
-                                account.isadmin = num;
-                                println!("Le compte {} a IsAdmin = {}", account_name, account.isadmin);
-                            }else{
-                                println!("Le boolean n'est pas correct.");
-                                prompt("Appuyez sur entrer pour continuer.");
-                            }
-                        },
-                        "3" => {
-
-                        },
-                        _ => {
-                            println!("Mauvais choix.");
-                            prompt("Appuyez sur entrer pour continuer.");
-                        },
+                            },
+                        }
                     }
                 }
                 break;
@@ -330,14 +401,49 @@ fn choice_admin_account(database_account: &mut HashMap<String, Account>){
             _ => {
                 println!("Mauvais choix.");
                 prompt("Appuyez sur entrer pour continuer.");
+                continue;
             },
         }
-
         prompt("Appuyez sur entrer pour continuer.");
     }
-    prompt("Appuyez sur entrer pour continuer.");
 }
 
-fn choice_admin_login(database_login: &mut HashMap<&str, &str>){
+fn choice_admin_login(database_login: &mut HashMap<String, String>, database_account: &mut HashMap<String, Account>){
+    loop{
+        println!("\nAdmin\n   Login Manager\n      1: Afficher tout les comptes\n      2: Ajouter un login\n      3: Supprimer un login\n      4: Exit Login Manager");
+        let buffer: String = prompt("      Choix: ");
 
+        match buffer.as_str(){
+            "1" => {
+                println!("\nAccount:");
+                for (username, password) in &mut *database_login{
+                    println!("   username: {}, password: {}", username, password);
+                }
+            },
+            "2" => {
+                println!("\nAjouter un compte:");
+                let account_name: String = prompt("Username du compte à ajouter ou entre (cancel) pour annuler: ");
+                let account_pass: String = prompt("Password du compte à ajouter ou entre (cancel) pour annuler: ");
+
+                if account_name == "cancel" || account_pass == "cancel" {
+                    continue;
+                }
+
+                if database_login.contains_key(&account_name){
+                    println!("Ce compte existe déjà");
+                    continue;
+                }
+
+                database_login.insert(account_name.clone(),account_pass.clone());
+                database_account.insert(account_name.clone(), Account { username: account_name.clone(), isadmin: false, money: 100.0, inventory: HashMap::new() });
+                println!("Ce compte a bien été ajouter.");
+            }
+            "4" => break,
+            _ => {
+                println!("Mauvais choix.");
+                prompt("Appuyez sur entrer pour continuer.");
+            },
+        }
+        prompt("Appuyez sur entrer pour continuer.");
+    }
 }
