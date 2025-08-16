@@ -316,7 +316,7 @@ fn choice_admin_account(database_account: &mut HashMap<String, Account>){
                             }
                         },
                         "3" => {
-                            
+
                         },
                         _ => {
                             println!("Mauvais choix.");
