@@ -1,16 +1,35 @@
 use std::io::{self, Write};
 use std::collections::HashMap;
+use std::process::Command;
+use std::thread;
+use std::time::Duration;
+use rand::Rng;
 
 struct Account {
     username: String,
+    password: String,
     isadmin: bool,
     money: f64,
     inventory: HashMap<String, i32>
 }
 
-fn log_in(database_login: &HashMap<String, String>, username: &str, password: &str) -> bool {
-    for (user, pass) in database_login{
-        if *user == username && *pass == password {
+const SYMBOL_PATTERN: [&str; 3] = ["X", "O", "V"];
+
+fn clear_console() {
+    if cfg!(target_os = "windows") {
+        Command::new("cmd").args(&["/C", "cls"]).status().unwrap();
+    } else {
+        Command::new("clear").status().unwrap();
+    }
+}
+
+fn sleep(duration: Duration){
+    thread::sleep(duration);
+}
+
+fn log_in(database_account: &HashMap<String, Account>, username: &str, password: &str) -> bool {
+    for (user, pass) in database_account{
+        if *user == username && *pass.password == *password {
             return true;
         }
     }
@@ -27,40 +46,39 @@ fn prompt(message: &str) -> String {
 }
 
 fn main() {
-    let mut database_login: HashMap<String, String> = HashMap::new();
-    database_login.insert("admin".to_string(), "admin".to_string());
-
     let mut database_account: HashMap<String, Account> = HashMap::new();
-    database_account.insert("admin".to_string(), Account { username: "admin".to_string(), isadmin: true, money: 100.0, inventory: HashMap::new()});
+    database_account.insert("admin".to_string(), Account { username: "admin".to_string(), password: "admin".to_string(), isadmin: true, money: 100.0, inventory: HashMap::new()});
 
     let mut item_shop: HashMap<String, f64> = HashMap::new();
     item_shop.insert("Eau".to_string(), 2.0);
 
-    login(&mut database_login, &mut database_account, &mut item_shop);
+    let mut multiplication_win: f64 = 5.0;
+
+    login(&mut database_account, &mut item_shop, &mut multiplication_win);
 }
 
-fn login(mut database_login: &mut HashMap<String, String>, mut database_account: &mut HashMap<String, Account>, mut item_shop: &mut HashMap<String, f64>){
-    print!("\n");
+fn login(mut database_account: &mut HashMap<String, Account>, mut item_shop: &mut HashMap<String, f64>, mut multiplication_win: &mut f64){
+    clear_console();
     let username = prompt("Username: ");
     let password = prompt("Password: ");
-    if !log_in(&database_login, &username, &password) {
+    if !log_in(&database_account, &username, &password) {
         println!("Connection failed: Login or password are wrong.");
         return;
     }
 
-    connected(&mut database_login, &mut database_account, &mut item_shop,&username);
+    connected(&mut database_account, &mut item_shop,&username, &mut multiplication_win);
 }
 
-fn connected(mut database_login: &mut HashMap<String, String>, mut database_account: &mut HashMap<String, Account>, mut item_shop: &mut HashMap<String, f64>, username: &str){
+fn connected(mut database_account: &mut HashMap<String, Account>, mut item_shop: &mut HashMap<String, f64>, username: &str, mut multiplication_win: &mut f64){
     loop{
-        print!("\n");
+        clear_console();
         println!("Menu:\n   1: Compte\n   2: Magasin\n   3: Casino\n   4: Admin\n   5: Deconnexion");
         match prompt("Choix : ").as_str(){
             "1" => choice_account(&database_account, &username),
             "2" => choice_shop(&mut database_account, &item_shop, &username),
-            "3" => println!("Coming soon"),
-            "4" => choice_admin(&mut database_login, &mut database_account, &mut item_shop, &username),
-            "5" => login(&mut database_login, &mut database_account, &mut item_shop),
+            "3" => choice_casino(&mut database_account,&username, &mut multiplication_win),
+            "4" => choice_admin(&mut database_account, &mut item_shop, &username),
+            "5" => login(&mut database_account, &mut item_shop, &mut multiplication_win),
             _ => {
                 println!("Mauvais choix.");
                 prompt("Appuyez sur entrer pour continuer.");
@@ -69,8 +87,97 @@ fn connected(mut database_login: &mut HashMap<String, String>, mut database_acco
     }
 }
 
+fn choice_casino(mut database_account: &mut HashMap<String, Account>, username: &str, mut multiplication_win: &mut f64){
+    loop {
+        clear_console();
+        println!("Casino:\n   1: Spin Game\n   2: BlackJack\n   3: Russian Roulette\n   4: Exit Casino");
+        match prompt("Choix: ").as_str() {
+            "1" => choice_casino_spin(&mut database_account,&username, &mut multiplication_win),
+            "2" => choice_casino_blackjack(),
+            "3" => choice_casino_russian(),
+            "4" => break,
+            _ => {
+                println!("Mauvais choix.");
+                prompt("Appuyez sur entrer pour continuer.");
+            },
+        }
+    }
+    prompt("Appuyez sur entrer pour continuer.");
+}
+
+fn choice_casino_spin(database_account: &mut HashMap<String, Account>, username: &str, multiplication_win: &mut f64){
+    if let Some(account) = database_account.get_mut(username){
+        loop {
+            clear_console();
+            println!("Argent: {}€\nCasino:\n   Spin Game",account.money);
+            let buffer: String = prompt("      Combien voulez-vous miser ou entrer (exit) pour quitter : ");
+            if buffer == "exit" {
+                break;
+            }
+            if let Ok(num_as_f64) = buffer.parse::<f64>(){
+                if num_as_f64 < 1.0 {
+                    println!("Vous devez miser au minimum 1€.");
+                    prompt("Appuyez sur entrer pour continuer.");
+                    return;
+                }
+                
+                if account.money < num_as_f64 {
+                    println!("Vous n'avez pas assez d'argent.");
+                    prompt("Appuyez sur entrer pour continuer.");
+                    return;
+                }
+                
+                let mut rng = rand::thread_rng();
+                for i in 1..=6 {
+                    let symbol1: usize = rng.gen_range(0..3);
+                    let symbol2: usize = rng.gen_range(0..3);
+                    let symbol3: usize = rng.gen_range(0..3);
+
+                    clear_console();
+                    println!(
+                        "Casino:\n   Spin Game:\n      [{}] [{}] [{}]",
+                        SYMBOL_PATTERN[symbol1],
+                        SYMBOL_PATTERN[symbol2],
+                        SYMBOL_PATTERN[symbol3]
+                    );
+
+                    sleep(Duration::from_millis(500));
+
+                    if i == 6 {
+                        if symbol1 == symbol2 && symbol2 == symbol3{
+                            let win: f64 = num_as_f64 * *multiplication_win;
+                            account.money += win;
+                            println!("Vous avez gagner {}€. Votre argent a fais {}x{}.", win, num_as_f64, multiplication_win);
+                            prompt("Appuyez sur entrer pour continuer.");
+                        }else{
+                            account.money -= num_as_f64;
+                            println!("Vous avez perdue {}€. Mais vous savez 1 de perdue c'est 10 de gagner.", num_as_f64);
+                            prompt("Appuyez sur entrer pour continuer.");
+                        }
+                    }
+                }
+            }else{
+                println!("Veuillez rentrez un chiffe valide.");
+                prompt("Appuyez sur entrer pour continuer.");
+            }
+        }
+    }else{
+        println!("Erreur de compte");
+        prompt("Appuyez sur entrer pour continuer.");
+        return;
+    }
+}
+
+fn choice_casino_blackjack(){
+    println!("Je vais die.")
+}
+
+fn choice_casino_russian(){
+    println!("Je vais die.")
+}
+
 fn choice_account(database_account: &HashMap<String, Account>, username: &str){
-    print!("\n");
+    clear_console();
     if let Some(account) = database_account.get(username) {
         println!("--- Compte ---\nCompte: {}\nArgent: {}€\nInventaire: ", account.username, account.money);
         for (name, number) in &account.inventory {
@@ -84,9 +191,9 @@ fn choice_account(database_account: &HashMap<String, Account>, username: &str){
 
 fn choice_shop(database_account: &mut HashMap<String, Account>, item_shop: &HashMap<String, f64>,username: &str){
     loop{
-        print!("\n");
+        clear_console();
         if let Some(account) = database_account.get_mut(username) {
-            print!("\n--- Magasin ---\nArgent: {}€\nArticle: \n", account.money);
+            print!("-- Magasin ---\nArgent: {}€\nArticle: \n", account.money);
             let mut index: i32 = 0;
             for (article, prix) in item_shop{
                 index += 1;
@@ -117,6 +224,10 @@ fn choice_shop(database_account: &mut HashMap<String, Account>, item_shop: &Hash
                     continue;
                 }else{
                         if let Ok(num) = nombre_article.parse::<i32>(){
+                            if num < 1 {
+                                println!("Vous devez prendre au minimum 1 article.");
+                                continue;
+                            }
                             if account.money >= prix * num as f64{
                                 println!("Vous avez bien acheté {} {}", num, article);
                                 account.money -= prix * num as f64;
@@ -126,7 +237,7 @@ fn choice_shop(database_account: &mut HashMap<String, Account>, item_shop: &Hash
                                 println!("Vous n'avez pas assez de fond pour vous achetez {} {} pour {}€", num, article, prix * num as f64);
                             }
                         }else{
-                            println!("Erreur de conversion en float64.")
+                            println!("Vous devez avoir un chiffre sans virgule.")
                         }
                 }
             } else {
@@ -140,21 +251,21 @@ fn choice_shop(database_account: &mut HashMap<String, Account>, item_shop: &Hash
     }
 }
 
-fn choice_admin(database_login: &mut HashMap<String, String>, database_account: &mut HashMap<String, Account>, item_shop: &mut HashMap<String, f64>, username: &str){
+fn choice_admin(database_account: &mut HashMap<String, Account>, item_shop: &mut HashMap<String, f64>, username: &str){
     loop{
-        print!("\n");
+        clear_console();
         if let Some(account) = database_account.get(username){
             if !account.isadmin{
                 println!("Votre compte n'est pas admin.");
                 break;
             }
 
-            println!("Admin:\n   1: Article Manager\n   2: Compte Manager\n   3: Login Manager\n   4: Exit Admin");
+            println!("Admin:\n   1: Article Manager\n   2: Compte Manager\n   3: Casino Manager\n   4: Exit Admin");
             let buffer: String = prompt("   Choix: ");
             match buffer.as_str(){
                 "1" => choice_admin_item(item_shop),
                 "2" => choice_admin_account(database_account),
-                "3" => choice_admin_login(database_login, database_account),
+                "3" => println!("Coming soon!"),
                 "4" => break,
                 _ => {
                     println!("Mauvais choix.");
@@ -170,7 +281,7 @@ fn choice_admin(database_login: &mut HashMap<String, String>, database_account: 
 
 fn choice_admin_item(item_shop: &mut HashMap<String, f64>){
     loop{
-        print!("\n");
+        clear_console();
         println!("Admin:\n   Article Manager:\n      1: Afficher article\n      2: Ajouter article\n      3: Supprimer article\n      4: Modifier article\n      5: Exit Item Manager");
         let buffer: String = prompt("      Choix: ");
 
@@ -260,8 +371,8 @@ fn choice_admin_item(item_shop: &mut HashMap<String, f64>){
 
 fn choice_admin_account(database_account: &mut HashMap<String, Account>){
     loop {
-        print!("\n");
-        println!("Admin:\n   Compte Manager:\n      1: Afficher tout les comptes\n      2: Modifier un compte\n      3: Exit Compte Manager");
+        clear_console();
+        println!("Admin:\n   Compte Manager:\n      1: Afficher tout les comptes\n      2: Modifier un compte\n      3: Afficher tout les logins\n      4: Ajouter un login\n      5: Supprimer un login\n      6: Exit Compte Manager");
         let buffer: String = prompt("      Choix: ");
         match buffer.as_str(){
             "1" => {
@@ -397,30 +508,13 @@ fn choice_admin_account(database_account: &mut HashMap<String, Account>){
                 }
                 break;
             },
-            "3" => break,
-            _ => {
-                println!("Mauvais choix.");
-                prompt("Appuyez sur entrer pour continuer.");
-                continue;
-            },
-        }
-        prompt("Appuyez sur entrer pour continuer.");
-    }
-}
-
-fn choice_admin_login(database_login: &mut HashMap<String, String>, database_account: &mut HashMap<String, Account>){
-    loop{
-        println!("\nAdmin\n   Login Manager\n      1: Afficher tout les comptes\n      2: Ajouter un login\n      3: Supprimer un login\n      4: Exit Login Manager");
-        let buffer: String = prompt("      Choix: ");
-
-        match buffer.as_str(){
-            "1" => {
+            "3" => {
                 println!("\nAccount:");
-                for (username, password) in &mut *database_login{
-                    println!("   username: {}, password: {}", username, password);
+                for (username, account) in &mut *database_account{
+                    println!("   username: {}, password: {}", username, account.password);
                 }
             },
-            "2" => {
+            "4" => {
                 println!("\nAjouter un compte:");
                 let account_name: String = prompt("Username du compte à ajouter ou entre (cancel) pour annuler: ");
                 let account_pass: String = prompt("Password du compte à ajouter ou entre (cancel) pour annuler: ");
@@ -429,19 +523,36 @@ fn choice_admin_login(database_login: &mut HashMap<String, String>, database_acc
                     continue;
                 }
 
-                if database_login.contains_key(&account_name){
+                if database_account.contains_key(&account_name){
                     println!("Ce compte existe déjà");
                     continue;
                 }
 
-                database_login.insert(account_name.clone(),account_pass.clone());
-                database_account.insert(account_name.clone(), Account { username: account_name.clone(), isadmin: false, money: 100.0, inventory: HashMap::new() });
+                database_account.insert(account_name.clone(),Account { username: account_name.clone(), password: account_pass, isadmin: false, money: 100.0, inventory: HashMap::new() });
                 println!("Ce compte a bien été ajouter.");
-            }
-            "4" => break,
+            },
+            "5" => {
+                println!("\nSupprimer un compte:");
+                let account_name: String = prompt("Username du compte à supprimer ou entre (cancel) pour annuler: ");
+
+                if account_name == "cancel" {
+                    continue;
+                }
+
+                if !database_account.contains_key(&account_name){
+                    println!("Ce compte n'existe pas.");
+                    prompt("Appuyez sur entrer pour continuer.");
+                    continue;
+                }
+
+                database_account.remove(&account_name);
+                println!("Ce compte a bien été supprimer.");
+            },
+            "6" => break,
             _ => {
                 println!("Mauvais choix.");
                 prompt("Appuyez sur entrer pour continuer.");
+                continue;
             },
         }
         prompt("Appuyez sur entrer pour continuer.");
